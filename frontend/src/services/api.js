@@ -45,3 +45,30 @@ export async function fetchPythonTemplate() {
   const res = await fetch(`${API_BASE}/python-template`);
   return res.json();
 }
+
+export async function runMonteCarlo(payload) {
+  const res = await fetch(`${API_BASE}/analytics/monte-carlo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Monte Carlo simulation failed" }));
+    throw new Error(err.detail || "Monte Carlo simulation failed");
+  }
+  return res.json();
+}
+
+export async function runOptimization(payload) {
+  const res = await fetch(`${API_BASE}/strategies/optimize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Optimization failed" }));
+    throw new Error(err.detail || "Optimization failed");
+  }
+  return res.json();
+}
+

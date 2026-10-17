@@ -59,40 +59,53 @@ def _fetch_from_binance(symbol: str, interval: str, lookback_days: int) -> Optio
     if interval not in valid_intervals:
         interval = "1h"
 
-    # Max limit per request is 1000
+    # Paginate requests if needed (up to 10,000 bars max to avoid rate limits)
     now = datetime.datetime.now(datetime.timezone.utc)
     start_time = now - datetime.timedelta(days=lookback_days)
-    start_ts = int(start_time.timestamp() * 1000)
+    end_ts = int(now.timestamp() * 1000)
+    current_start_ts = int(start_time.timestamp() * 1000)
 
     url = "https://api.binance.com/api/v3/klines"
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "startTime": start_ts,
-        "limit": 1000,
-    }
-
-    resp = requests.get(url, params=params, timeout=10)
-    resp.raise_for_status()
-    raw_data = resp.json()
-
-    if not isinstance(raw_data, list) or len(raw_data) == 0:
-        return None
-
     records = []
-    for item in raw_data:
-        # [open_time, open, high, low, close, volume, close_time, quote_volume, count, ...]
-        records.append({
-            "timestamp": pd.to_datetime(item[0], unit="ms", utc=True),
-            "open": float(item[1]),
-            "high": float(item[2]),
-            "low": float(item[3]),
-            "close": float(item[4]),
-            "volume": float(item[5]),
-        })
+    max_requests = 10
+
+    for _ in range(max_requests):
+        params = {
+            "symbol": symbol,
+            "interval": interval,
+            "startTime": current_start_ts,
+            "endTime": end_ts,
+            "limit": 1000,
+        }
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        raw_data = resp.json()
+
+        if not isinstance(raw_data, list) or len(raw_data) == 0:
+            break
+
+        for item in raw_data:
+            records.append({
+                "timestamp": pd.to_datetime(item[0], unit="ms", utc=True),
+                "open": float(item[1]),
+                "high": float(item[2]),
+                "low": float(item[3]),
+                "close": float(item[4]),
+                "volume": float(item[5]),
+            })
+
+        # Check last candle close time (item[6]) to advance
+        last_close_time = item[6]
+        if last_close_time >= end_ts or len(raw_data) < 1000:
+            break
+        current_start_ts = last_close_time + 1
+
+    if not records:
+        return None
 
     df = pd.DataFrame(records)
     df.set_index("timestamp", inplace=True)
+    df = df[~df.index.duplicated(keep="first")]
     df.sort_index(inplace=True)
     return df
 

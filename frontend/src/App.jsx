@@ -8,6 +8,9 @@ import DrawdownChart from './components/DrawdownChart';
 import TradeLogTable from './components/TradeLogTable';
 import PythonSdkModal from './components/PythonSdkModal';
 import CustomStrategyEditor from './components/CustomStrategyEditor';
+import MonteCarloModal from './components/MonteCarloModal';
+import OptimizerModal from './components/OptimizerModal';
+import { generateInstitutionalReport } from './utils/exportReport';
 import {
   fetchHealth,
   fetchSymbols,
@@ -15,7 +18,7 @@ import {
   runBacktest,
   runCustomStrategy,
 } from './services/api';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [apiOnline, setApiOnline] = useState(false);
@@ -54,6 +57,8 @@ export default function App() {
   // Modals
   const [showPythonModal, setShowPythonModal] = useState(false);
   const [showCustomEditor, setShowCustomEditor] = useState(false);
+  const [showMonteCarloModal, setShowMonteCarloModal] = useState(false);
+  const [showOptimizerModal, setShowOptimizerModal] = useState(false);
 
   const executeBacktest = useCallback(async (customConf = null) => {
     setLoading(true);
@@ -137,14 +142,26 @@ export default function App() {
     }
   };
 
+  const handleApplyOptimizedParams = (newParams) => {
+    const updated = {
+      ...config,
+      params: { ...config.params, ...newParams },
+    };
+    setConfig(updated);
+    executeBacktest(updated);
+  };
+
   return (
     <div className="app-layout">
       {/* Top Navbar */}
       <Navbar
         apiOnline={apiOnline}
+        onOpenOptimizer={() => setShowOptimizerModal(true)}
+        onOpenMonteCarlo={() => setShowMonteCarloModal(true)}
+        onExportReport={() => generateInstitutionalReport(result, config)}
         onOpenPythonModal={() => setShowPythonModal(true)}
         onOpenCustomEditor={() => setShowCustomEditor(true)}
-        onRunBacktest={executeBacktest}
+        onRunBacktest={() => executeBacktest()}
         loading={loading}
       />
 
@@ -183,10 +200,11 @@ export default function App() {
             <TearsheetStats metrics={result.metrics} />
           )}
 
-          {/* Interactive Candlestick Chart with Buy/Sell Signals */}
+          {/* Interactive Candlestick Chart with Buy/Sell Execution Overlay */}
           <CandlestickChart
             candles={result?.candles || []}
             signals={result?.signals || []}
+            trades={result?.trades || []}
             symbol={config.symbol}
             timeframe={config.timeframe}
           />
@@ -221,6 +239,22 @@ export default function App() {
         onClose={() => setShowCustomEditor(false)}
         onRunCustom={handleRunCustomStrategy}
         loading={loading}
+      />
+
+      {/* Monte Carlo Risk & Ruin Modal */}
+      <MonteCarloModal
+        isOpen={showMonteCarloModal}
+        onClose={() => setShowMonteCarloModal(false)}
+        trades={result?.trades || []}
+        initialCapital={config.initial_capital}
+      />
+
+      {/* Parameter Optimizer Grid Search Modal */}
+      <OptimizerModal
+        isOpen={showOptimizerModal}
+        onClose={() => setShowOptimizerModal(false)}
+        config={config}
+        onApplyParams={handleApplyOptimizedParams}
       />
     </div>
   );

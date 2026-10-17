@@ -18,6 +18,14 @@ def execute_custom_strategy(code_str: str, df: pd.DataFrame, params: Dict[str, A
         "params": params,
     }
 
+    ALLOWED_MODULES = {"pandas", "numpy", "math", "datetime", "scipy"}
+
+    def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+        base_module = name.split(".")[0]
+        if base_module in ALLOWED_MODULES:
+            return __import__(name, globals, locals, fromlist, level)
+        raise ImportError(f"Import of module '{name}' is not permitted in custom strategies.")
+
     # Safe builtins
     safe_builtins = {
         "range": range,
@@ -37,6 +45,8 @@ def execute_custom_strategy(code_str: str, df: pd.DataFrame, params: Dict[str, A
         "enumerate": enumerate,
         "zip": zip,
         "print": print,
+        "isinstance": isinstance,
+        "__import__": safe_import,
     }
 
     exec_globals = {
@@ -51,7 +61,19 @@ def execute_custom_strategy(code_str: str, df: pd.DataFrame, params: Dict[str, A
         raise ValueError(f"Execution error in custom strategy code: {e}")
 
     if "generate_signals" in local_namespace and callable(local_namespace["generate_signals"]):
-        signals = local_namespace["generate_signals"](df)
+        func = local_namespace["generate_signals"]
+        import inspect
+        try:
+            sig = inspect.signature(func)
+            if len(sig.parameters) >= 2:
+                signals = func(df, params)
+            else:
+                signals = func(df)
+        except (ValueError, TypeError):
+            try:
+                signals = func(df, params)
+            except TypeError:
+                signals = func(df)
     elif "signals" in local_namespace:
         signals = local_namespace["signals"]
     else:

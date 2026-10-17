@@ -93,3 +93,48 @@ class BacktestResponse(BaseModel):
     equity_curve: List[Dict[str, Any]]  # [{"time": str, "equity": float, "benchmark": float, "drawdown": float}]
     trades: List[TradeRecord]
     signals: List[Dict[str, Any]]  # [{"time": str, "signal": int, "price": float}]
+
+
+class MonteCarloRequest(BaseModel):
+    trades: List[Dict[str, Any]]
+    initial_capital: float = Field(default=10000.0, gt=0)
+    num_simulations: int = Field(default=500, ge=50, le=2000)
+
+
+class MonteCarloResponse(BaseModel):
+    status: str = "success"
+    num_simulations: int
+    num_trades_simulated: int
+    metrics: Dict[str, Any]
+    percentile_curves: Dict[str, Any]
+    sample_paths: List[List[float]]
+
+
+class OptimizationRequest(BaseModel):
+    strategy: str = Field(default="sma_crossover")
+    symbol: str = Field(default="BTCUSDT")
+    timeframe: str = Field(default="1h")
+    lookback_days: int = Field(default=90, ge=1, le=730)
+    param_grid: Dict[str, List[Any]] = Field(default_factory=dict)
+    initial_capital: float = Field(default=10000.0, gt=0)
+    commission_rate: float = Field(default=0.001, ge=0.0)
+    slippage_rate: float = Field(default=0.0005, ge=0.0)
+    position_size_pct: float = Field(default=1.0, ge=0.01, le=1.0)
+    allow_short: bool = Field(default=False)
+    stop_loss_pct: Optional[float] = Field(default=None)
+    take_profit_pct: Optional[float] = Field(default=None)
+    sort_by: str = Field(default="sharpe_ratio")
+    max_combinations: int = Field(default=36, ge=1, le=100)
+
+
+class OptimizationResponse(BaseModel):
+    status: str = "success"
+    strategy: str
+    symbol: str
+    timeframe: str
+    lookback_days: int
+    total_combinations_tested: int
+    sorted_by: str
+    best_result: Optional[Dict[str, Any]]
+    leaderboard: List[Dict[str, Any]]
+

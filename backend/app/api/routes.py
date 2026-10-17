@@ -1,9 +1,19 @@
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any, List
-from ..schemas import BacktestRequest, CustomStrategyRequest, BacktestResponse
+from ..schemas import (
+    BacktestRequest,
+    CustomStrategyRequest,
+    BacktestResponse,
+    MonteCarloRequest,
+    MonteCarloResponse,
+    OptimizationRequest,
+    OptimizationResponse,
+)
 from ..core.strategies import get_available_strategies, STRATEGY_REGISTRY
 from ..core.data_fetcher import AVAILABLE_SYMBOLS
 from ..core.backtest_engine import run_backtest_simulation
+from ..core.monte_carlo import run_monte_carlo_simulation
+from ..core.optimizer import optimize_strategy_parameters
 
 router = APIRouter(prefix="/api")
 
@@ -84,6 +94,47 @@ def run_custom_strategy(req: CustomStrategyRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Custom strategy error: {str(e)}")
+
+
+@router.post("/analytics/monte-carlo", response_model=MonteCarloResponse)
+def run_monte_carlo(req: MonteCarloRequest):
+    try:
+        res = run_monte_carlo_simulation(
+            trades=req.trades,
+            initial_capital=req.initial_capital,
+            num_simulations=req.num_simulations,
+        )
+        if "error" in res:
+            raise HTTPException(status_code=400, detail=res["error"])
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Monte Carlo simulation failed: {str(e)}")
+
+
+@router.post("/strategies/optimize", response_model=OptimizationResponse)
+def run_optimization(req: OptimizationRequest):
+    try:
+        res = optimize_strategy_parameters(
+            strategy=req.strategy,
+            symbol=req.symbol,
+            timeframe=req.timeframe,
+            lookback_days=req.lookback_days,
+            param_grid=req.param_grid,
+            initial_capital=req.initial_capital,
+            commission_rate=req.commission_rate,
+            slippage_rate=req.slippage_rate,
+            position_size_pct=req.position_size_pct,
+            allow_short=req.allow_short,
+            stop_loss_pct=req.stop_loss_pct,
+            take_profit_pct=req.take_profit_pct,
+            sort_by=req.sort_by,
+            max_combinations=req.max_combinations,
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Optimization error: {str(e)}")
 
 
 @router.get("/python-template")

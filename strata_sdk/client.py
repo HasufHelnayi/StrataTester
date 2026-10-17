@@ -145,7 +145,10 @@ class StrataClient:
         initial_capital: float = 10000.0,
         commission_rate: float = 0.001,
         slippage_rate: float = 0.0005,
+        position_size_pct: float = 1.0,
         allow_short: bool = False,
+        stop_loss_pct: Optional[float] = None,
+        take_profit_pct: Optional[float] = None,
     ) -> BacktestResult:
         """
         Runs a custom Python strategy script directly on the StrataTester engine.
@@ -158,7 +161,10 @@ class StrataClient:
             "initial_capital": initial_capital,
             "commission_rate": commission_rate,
             "slippage_rate": slippage_rate,
+            "position_size_pct": position_size_pct,
             "allow_short": allow_short,
+            "stop_loss_pct": stop_loss_pct,
+            "take_profit_pct": take_profit_pct,
         }
 
         r = requests.post(f"{self.base_url}/api/strategies/custom", json=payload, timeout=60)
@@ -166,3 +172,64 @@ class StrataClient:
             raise RuntimeError(f"Custom Strategy API error ({r.status_code}): {r.text}")
 
         return BacktestResult(r.json())
+
+    def run_monte_carlo(
+        self,
+        trades: list,
+        initial_capital: float = 10000.0,
+        num_simulations: int = 500,
+    ) -> Dict[str, Any]:
+        """
+        Executes Monte Carlo trade reshuffling to calculate confidence intervals and drawdown risk.
+        """
+        payload = {
+            "trades": trades,
+            "initial_capital": initial_capital,
+            "num_simulations": num_simulations,
+        }
+        r = requests.post(f"{self.base_url}/api/analytics/monte-carlo", json=payload, timeout=30)
+        if not r.ok:
+            raise RuntimeError(f"Monte Carlo API error ({r.status_code}): {r.text}")
+        return r.json()
+
+    def optimize_parameters(
+        self,
+        strategy: str,
+        param_grid: Dict[str, list],
+        symbol: str = "BTCUSDT",
+        timeframe: str = "1h",
+        lookback_days: int = 90,
+        initial_capital: float = 10000.0,
+        commission_rate: float = 0.001,
+        slippage_rate: float = 0.0005,
+        position_size_pct: float = 1.0,
+        allow_short: bool = False,
+        stop_loss_pct: Optional[float] = None,
+        take_profit_pct: Optional[float] = None,
+        sort_by: str = "sharpe_ratio",
+        max_combinations: int = 36,
+    ) -> Dict[str, Any]:
+        """
+        Performs grid search parameter sweep across combinations for a given strategy.
+        """
+        payload = {
+            "strategy": strategy,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "lookback_days": lookback_days,
+            "param_grid": param_grid,
+            "initial_capital": initial_capital,
+            "commission_rate": commission_rate,
+            "slippage_rate": slippage_rate,
+            "position_size_pct": position_size_pct,
+            "allow_short": allow_short,
+            "stop_loss_pct": stop_loss_pct,
+            "take_profit_pct": take_profit_pct,
+            "sort_by": sort_by,
+            "max_combinations": max_combinations,
+        }
+        r = requests.post(f"{self.base_url}/api/strategies/optimize", json=payload, timeout=120)
+        if not r.ok:
+            raise RuntimeError(f"Optimization API error ({r.status_code}): {r.text}")
+        return r.json()
+

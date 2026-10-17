@@ -33,16 +33,21 @@ class RSIReversionStrategy(BaseStrategy):
 
         rsi = compute_rsi(df["close"], period=period)
 
-        # State machine signal generation: enter long when RSI < oversold, exit when RSI > 50 or overbought
-        signal = pd.Series(0, index=df.index, dtype=int)
+        # High-performance NumPy array state machine
+        rsi_vals = rsi.values
+        n = len(rsi_vals)
+        sig_arr = np.zeros(n, dtype=np.int64)
         current_state = 0
 
-        for i in range(len(df)):
-            val = rsi.iloc[i]
+        for i in range(n):
+            val = rsi_vals[i]
+            if np.isnan(val):
+                sig_arr[i] = 0
+                continue
             if val < oversold:
                 current_state = 1
             elif val > overbought:
                 current_state = -1
-            signal.iloc[i] = current_state
+            sig_arr[i] = current_state
 
-        return signal
+        return pd.Series(sig_arr, index=df.index, dtype=int)
