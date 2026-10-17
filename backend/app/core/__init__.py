@@ -1,0 +1,1 @@
+# StrataTester Core Engine package
